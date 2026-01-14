@@ -106,7 +106,10 @@ function loadImage(src: string): Promise<HTMLImageElement> {
         img.crossOrigin = 'anonymous';
         img.src = src;
         img.onload = () => resolve(img);
-        img.onerror = (e) => reject(new Error(`Failed to load image: ${src}`));
+        img.onerror = () => {
+            console.error(`Failed to load image at ${src}`);
+            reject(new Error(`Failed to load image: ${src}`));
+        };
     });
 }
 
