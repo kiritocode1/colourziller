@@ -77,16 +77,28 @@ export interface PaintColor {
 }
 
 // Default paint color palette - vibrant, saturated colors for exterior paint
+// Default paint color palette - vibrant, saturated colors for exterior paint
 export const PAINT_PALETTE: PaintColor[] = [
+    // Warm Tones
     { id: 'coral', name: 'Coral Red', hex: '#E05040' },
-    { id: 'emerald', name: 'Emerald Green', hex: '#2D8F6F' },
-    { id: 'sunflower', name: 'Sunflower Yellow', hex: '#F5C518' },
-    { id: 'royal', name: 'Royal Blue', hex: '#2955A8' },
-    { id: 'plum', name: 'Plum Purple', hex: '#7B4B8A' },
-    { id: 'ivory', name: 'Ivory White', hex: '#FFFEF0' },
     { id: 'terracotta', name: 'Terracotta', hex: '#C75B39' },
-    { id: 'teal', name: 'Deep Teal', hex: '#1A7F8E' },
     { id: 'burgundy', name: 'Burgundy', hex: '#8C2F39' },
+    { id: 'sunflower', name: 'Sunflower', hex: '#F5C518' },
+    { id: 'orange', name: 'Burnt Orange', hex: '#D97706' },
+
+    // Cool Tones
+    { id: 'royal', name: 'Royal Blue', hex: '#2955A8' },
+    { id: 'navy', name: 'Deep Navy', hex: '#1E3A8A' },
+    { id: 'teal', name: 'Deep Teal', hex: '#115E59' },
+    { id: 'emerald', name: 'Emerald', hex: '#059669' },
+    { id: 'mint', name: 'Soft Mint', hex: '#34D399' },
+
+    // Neutrals & Others
+    { id: 'plum', name: 'Plum Purple', hex: '#7B4B8A' },
+    { id: 'lavender', name: 'Lavender', hex: '#A78BFA' },
+    { id: 'ivory', name: 'Ivory White', hex: '#FFFEF0' },
+    { id: 'slate', name: 'Slate Grey', hex: '#475569' },
+    { id: 'charcoal', name: 'Charcoal', hex: '#1F2937' },
 ];
 
 // View modes
