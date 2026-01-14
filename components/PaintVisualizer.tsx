@@ -32,6 +32,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [isShareOpen, setIsShareOpen] = useState(false);
 
     // Image refs
     const [cleanedImage, setCleanedImage] = useState<HTMLImageElement | null>(null);
@@ -279,6 +280,24 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         ? calculateSelectionStats(selectedMaskIds, maskData.masks)
         : { maskCount: 0, pixelCount: 0 };
 
+    // Export function
+    const handleExport = (format: 'png' | 'jpeg') => {
+        if (!canvasRef.current) return;
+
+        try {
+            const dataUrl = canvasRef.current.toDataURL(`image/${format}`, 0.9);
+            const link = document.createElement('a');
+            link.download = `colorcraft-project-${maskData?.imageSetId || 'export'}.${format}`;
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            setIsShareOpen(false);
+        } catch (err) {
+            console.error('Export failed:', err);
+        }
+    };
+
     return (
         <div className="flex flex-col h-screen bg-black text-white font-sans selection:bg-white/20">
             {/* Minimal Navbar */}
@@ -303,9 +322,37 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                         ))}
                     </select>
 
-                    <button className="px-4 py-1.5 bg-white text-black text-xs font-semibold rounded-md hover:bg-gray-200 transition-colors">
-                        Share
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsShareOpen(!isShareOpen)}
+                            className="px-4 py-1.5 bg-white text-black text-xs font-semibold rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
+                        >
+                            Export
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className={`transition-transform duration-200 ${isShareOpen ? 'rotate-180' : ''}`}>
+                                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        </button>
+
+                        {isShareOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setIsShareOpen(false)} />
+                                <div className="absolute top-full right-0 mt-2 w-32 bg-[#0A0A0A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col py-1">
+                                    <button
+                                        onClick={() => handleExport('png')}
+                                        className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                        PNG Image
+                                    </button>
+                                    <button
+                                        onClick={() => handleExport('jpeg')}
+                                        className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                                    >
+                                        JPG Image
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </nav>
 
