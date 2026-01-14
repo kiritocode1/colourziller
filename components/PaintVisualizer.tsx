@@ -657,34 +657,36 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                     </div>
 
                     {/* Actions Footer */}
-                    <div className="p-4 border-t border-white/10 bg-black space-y-2">
-                        <motion.button
-                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                            onClick={applyColorToSelection}
-                            disabled={selectedMaskIds.size === 0}
-                            className="w-full py-2.5 bg-white text-black text-xs font-semibold rounded-md 
-                                disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                        >
-                            {selectedMaskIds.size > 0 ? (
-                                <>Apply Paint <span className="px-1.5 py-0.5 bg-black/10 rounded-full text-[9px]">{selectedMaskIds.size}</span></>
-                            ) : 'Select Region'}
-                        </motion.button>
+                    <div className="p-4 border-t border-white/10 bg-black">
+                        <div className="bg-[#0A0A0A] border border-white/10 rounded-xl p-3 space-y-2">
+                            <motion.button
+                                whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+                                onClick={applyColorToSelection}
+                                disabled={selectedMaskIds.size === 0}
+                                className="w-full py-3 bg-white text-black text-xs font-bold rounded-lg 
+                                    disabled:opacity-20 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-white/5"
+                            >
+                                {selectedMaskIds.size > 0 ? (
+                                    <>Apply Material <span className="flex items-center justify-center w-5 h-5 bg-black text-white rounded-full text-[10px] font-mono">{selectedMaskIds.size}</span></>
+                                ) : 'Select Region to Paint'}
+                            </motion.button>
 
-                        <div className="grid grid-cols-2 gap-2">
-                            <motion.button
-                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                onClick={() => setIsPaletteModalOpen(true)}
-                                className="w-full py-2 bg-gray-900 border border-white/10 text-gray-300 text-[10px] font-medium rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
-                            >
-                                <Palette className="w-3 h-3" /> View Palette
-                            </motion.button>
-                            <motion.button
-                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                                onClick={clearColors}
-                                className="w-full py-2 bg-gray-900 border border-white/10 text-gray-300 text-[10px] font-medium rounded-md hover:bg-gray-800 transition-colors"
-                            >
-                                Reset Canvas
-                            </motion.button>
+                            <div className="grid grid-cols-2 gap-2 pt-1">
+                                <motion.button
+                                    whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.05)" }} whileTap={{ scale: 0.98 }}
+                                    onClick={() => setIsPaletteModalOpen(true)}
+                                    className="w-full py-2.5 bg-transparent border border-white/10 text-gray-400 text-[10px] font-medium rounded-lg hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Palette className="w-3.5 h-3.5" /> Used Colors
+                                </motion.button>
+                                <motion.button
+                                    whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.05)" }} whileTap={{ scale: 0.98 }}
+                                    onClick={clearColors}
+                                    className="w-full py-2.5 bg-transparent border border-white/10 text-gray-400 text-[10px] font-medium rounded-lg hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Share2 className="w-3.5 h-3.5 rotate-180" /> Reset
+                                </motion.button>
+                            </div>
                         </div>
                     </div>
 
