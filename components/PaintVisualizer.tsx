@@ -422,8 +422,14 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
             {/* Navbar */}
             <nav className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-black border-b border-white/10">
                 <div className="flex items-center gap-3">
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-5 h-5 rounded-full bg-white" />
-                    <span className="text-sm font-semibold tracking-wide">ColorCraft</span>
+                    <motion.img
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        src="/logo.svg"
+                        alt="Colourziller"
+                        className="w-8 h-8"
+                    />
+                    <span className="text-sm font-semibold tracking-wide">Colourziller</span>
                     <span className="text-gray-600">/</span>
                     <span className="text-sm text-gray-400">Project {maskData?.imageSetId ?? '...'}</span>
                 </div>
