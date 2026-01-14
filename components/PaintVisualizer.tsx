@@ -220,17 +220,22 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
 
         if (!mask) return;
 
+        if (e.shiftKey) {
+            // SHIFT+click: Auto apply current color
+            if (activePaintColor) {
+                setAppliedColors(prev => {
+                    const newMap = new Map(prev);
+                    newMap.set(mask.id, activePaintColor);
+                    return newMap;
+                });
+            }
+            return;
+        }
+
         setSelectedMaskIds(prev => {
             const newSet = new Set(prev);
 
-            if (e.shiftKey) {
-                // SHIFT+click: Toggle mask in selection
-                if (newSet.has(mask.id)) {
-                    newSet.delete(mask.id);
-                } else {
-                    newSet.add(mask.id);
-                }
-            } else if (e.altKey || e.metaKey) {
+            if (e.altKey || e.metaKey) {
                 // ALT/CMD+click: Smart select similar masks
                 const similarMasks = findSimilarMasks(mask, maskData.masks);
                 for (const similar of similarMasks) {
@@ -244,7 +249,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
 
             return newSet;
         });
-    }, [maskData, pixelLookup]);
+    }, [maskData, pixelLookup, activePaintColor]);
 
     // Apply color to selected masks
     const applyColorToSelection = useCallback(() => {
@@ -318,7 +323,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                     {/* Hover instructions overlay */}
                     <div className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                         <div className="bg-black/80 backdrop-blur rounded-lg px-4 py-2 border border-white/10">
-                            <p className="text-xs text-gray-300 font-medium">Click to select • Shift+Click to add</p>
+                            <p className="text-xs text-gray-300 font-medium">Click to select • Shift+Click to paint</p>
                         </div>
                     </div>
 
