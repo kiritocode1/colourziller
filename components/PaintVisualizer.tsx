@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import type { MaskData, ViewMode } from '@/lib/types';
 import { IMAGE_SETS, PAINT_PALETTE } from '@/lib/types';
 import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks } from '@/lib/maskUtils';
-import { hexToRgb, applyPaintColor } from '@/lib/colorUtils';
+import { hexToRgb, rgbToHsl, applyPaintColor } from '@/lib/colorUtils';
 
 interface PaintVisualizerProps {
     className?: string;
@@ -280,130 +280,105 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
 
     return (
         <div className="flex flex-col h-screen bg-black text-white font-sans selection:bg-white/20">
-            {/* Navbar */}
-            <nav className="flex items-center justify-between px-8 py-6 sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5">
-                <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-orange-400 to-purple-500" />
-                    <span className="text-xl font-medium tracking-tight">ColorCraft</span>
-                </div>
-
-                <div className="flex items-center gap-8 text-sm font-medium text-gray-400">
-                    <button className="hover:text-white transition-colors">Gallery</button>
-                    <button className="hover:text-white transition-colors">Features</button>
-                    <button className="hover:text-white transition-colors">Pricing</button>
+            {/* Minimal Navbar */}
+            <nav className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-black border-b border-white/10">
+                <div className="flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-white" />
+                    <span className="text-sm font-semibold tracking-wide">ColorCraft</span>
+                    <span className="text-gray-600">/</span>
+                    <span className="text-sm text-gray-400">Project {maskData?.imageSetId}</span>
                 </div>
 
                 <div className="flex items-center gap-4">
-                    {/* Image Set Selector (Minimal) */}
-                    <div className="flex items-center gap-3 bg-white/5 rounded-full px-4 py-1.5 border border-white/10 hover:bg-white/10 transition-colors">
-                        <span className="text-xs text-gray-400 uppercase tracking-wider">Project</span>
-                        <select
-                            value={currentSetId}
-                            onChange={(e) => setCurrentSetId(e.target.value)}
-                            className="bg-transparent text-sm font-medium focus:outline-none appearance-none cursor-pointer text-white"
-                        >
-                            {IMAGE_SETS.map(set => (
-                                <option key={set.id} value={set.id} className="bg-gray-900 text-white">
-                                    {set.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
+                    <select
+                        value={currentSetId}
+                        onChange={(e) => setCurrentSetId(e.target.value)}
+                        className="bg-black text-xs font-medium border border-white/10 rounded-md px-3 py-1.5 focus:outline-none focus:border-white/30 transition-colors text-white hover:border-white/20 cursor-pointer"
+                    >
+                        {IMAGE_SETS.map(set => (
+                            <option key={set.id} value={set.id}>
+                                {set.name}
+                            </option>
+                        ))}
+                    </select>
 
-                    <button className="px-5 py-2 bg-white text-black text-sm font-medium rounded-full hover:bg-gray-200 transition-colors">
+                    <button className="px-4 py-1.5 bg-white text-black text-xs font-semibold rounded-md hover:bg-gray-200 transition-colors">
                         Share
                     </button>
                 </div>
             </nav>
 
-            {/* Main Content */}
-            <main className="flex-1 flex overflow-hidden p-6 gap-6">
-                {/* Canvas Area - The "Hero" Card */}
-                <div className="flex-1 relative bg-gray-900/50 rounded-[2rem] border border-white/10 overflow-hidden flex flex-col group">
-                    {/* Hover instructions overlay */}
-                    <div className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
-                        <div className="bg-black/80 backdrop-blur rounded-lg px-4 py-2 border border-white/10">
-                            <p className="text-xs text-gray-300 font-medium">Click to select • Shift+Click to paint</p>
+            {/* Main Content using Grid Layout */}
+            <main className="flex-1 overflow-hidden grid grid-cols-[1fr_320px]">
+
+                {/* Canvas Area */}
+                <div className="relative bg-black flex flex-col items-center justify-center p-8 group">
+                    {/* Minimal instructions */}
+                    <div className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                        <div className="bg-black border border-white/10 rounded px-3 py-1.5 shadow-xl">
+                            <p className="text-[10px] text-gray-400 font-mono">SHIFT + CLICK TO PAINT</p>
                         </div>
                     </div>
 
-                    <div className={`flex-1 relative flex items-center justify-center transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
-                        <div className="relative shadow-2xl shadow-black/50">
-                            <canvas
-                                ref={canvasRef}
-                                className="max-w-full max-h-[80vh] object-contain rounded-lg"
-                                style={{ cursor: 'crosshair' }}
-                            />
-                            <canvas
-                                ref={overlayCanvasRef}
-                                onClick={handleCanvasClick}
-                                className="absolute top-0 left-0 max-w-full max-h-[80vh] object-contain rounded-lg transition-transform duration-200"
-                                style={{ cursor: 'crosshair' }}
-                            />
-                        </div>
+                    <div className={`relative transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
+                        <canvas
+                            ref={canvasRef}
+                            className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl shadow-black"
+                            style={{ cursor: 'crosshair' }}
+                        />
+                        <canvas
+                            ref={overlayCanvasRef}
+                            onClick={handleCanvasClick}
+                            className="absolute top-0 left-0 max-w-full max-h-[85vh] object-contain rounded-md transition-transform duration-200"
+                            style={{ cursor: 'crosshair' }}
+                        />
                     </div>
 
                     {/* Loading State */}
                     {isLoading && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-20">
-                            <div className="flex flex-col items-center gap-3">
-                                <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span className="text-sm font-medium text-gray-400">Loading scene...</span>
-                            </div>
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20">
+                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
                         </div>
                     )}
                     {error && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-20">
-                            <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg text-sm hover:bg-red-500/20 transition-colors">{error} - Retry</button>
+                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+                            <span className="text-red-500 text-sm font-mono">{error}</span>
                         </div>
                     )}
                 </div>
 
-                {/* Sidebar Controls - "Floating Panel" style */}
-                <aside className="w-80 flex flex-col h-full bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl transition-all duration-300">
+                {/* Sidebar - Fixed to right, flat design */}
+                <aside className="border-l border-white/10 bg-black flex flex-col h-full">
 
-                    {/* Sidebar Header: Stats */}
-                    <div className="p-6 border-b border-white/5 bg-white/[0.02]">
-                        <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-medium text-white tracking-tight">Properties</h2>
-                            <div className="px-2 py-1 rounded-full bg-white/5 border border-white/10">
-                                <span className="text-[10px] font-mono text-gray-400">ID: {maskData?.imageSetId}</span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 rounded-2xl bg-black/40 border border-white/5 flex flex-col items-center justify-center group hover:border-white/10 transition-colors">
-                                <div className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1 group-hover:text-gray-400 transition-colors">Regions</div>
-                                <div className="text-xl font-semibold text-white">{stats.maskCount}</div>
-                            </div>
-                            <div className="p-3 rounded-2xl bg-black/40 border border-white/5 flex flex-col items-center justify-center group hover:border-white/10 transition-colors">
-                                <div className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1 group-hover:text-gray-400 transition-colors">Pixels</div>
-                                <div className="text-xl font-semibold text-white">{(stats.pixelCount / 1000).toFixed(1)}k</div>
-                            </div>
+                    {/* Header with minimal stats */}
+                    <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                        <span className="text-xs font-medium text-gray-400">Properties</span>
+                        <div className="flex gap-3 text-[10px] font-mono text-gray-500">
+                            <span>{stats.maskCount} REGIONS</span>
+                            <span>{(stats.pixelCount / 1000).toFixed(1)}K PX</span>
                         </div>
                     </div>
 
-                    {/* Scrollable Content: Tools & Palette */}
-                    <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                    {/* Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8 custom-scrollbar">
 
-                        {/* View Mode Toggle */}
+                        {/* View Mode - Segmented Control */}
                         <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3 block opacity-80">View Mode</label>
-                            <div className="flex bg-black/40 p-1.5 rounded-2xl border border-white/5">
+                            <div className="flex p-0.5 rounded-lg border border-white/10 bg-gray-900/50">
                                 <button
                                     onClick={() => setViewMode('normal')}
-                                    className={`flex-1 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 ${viewMode === 'normal'
-                                        ? 'bg-white/10 text-white shadow-lg shadow-black/20'
-                                        : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                                    className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all ${viewMode === 'normal'
+                                        ? 'bg-gray-800 text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-300'
                                         }`}
                                 >
                                     REALISTIC
                                 </button>
                                 <button
                                     onClick={() => setViewMode('all-masks')}
-                                    className={`flex-1 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 ${viewMode === 'all-masks'
-                                        ? 'bg-white/10 text-white shadow-lg shadow-black/20'
-                                        : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'
+                                    className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all ${viewMode === 'all-masks'
+                                        ? 'bg-gray-800 text-white shadow-sm'
+                                        : 'text-gray-500 hover:text-gray-300'
                                         }`}
                                 >
                                     X-RAY
@@ -411,62 +386,80 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                             </div>
                         </div>
 
-                        {/* Palette */}
-                        <div>
-                            <div className="flex items-center justify-between mb-3">
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-widest opacity-80">Materials</label>
-                                <span className="text-[10px] text-gray-600 bg-white/5 px-2 py-0.5 rounded-full">{PAINT_PALETTE.length} Colors</span>
+                        {/* Palette - Compact Grid & Details */}
+                        <div className="flex-1 flex flex-col min-h-0 gap-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-medium text-white">Materials</span>
+                                <span className="text-[10px] text-gray-500 font-mono">{PAINT_PALETTE.length}</span>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-3">
+                            {/* Color Grid */}
+                            <div className="grid grid-cols-5 gap-2 content-start">
                                 {PAINT_PALETTE.map(color => (
                                     <button
                                         key={color.id}
                                         onClick={() => setActivePaintColor(color.hex)}
-                                        className={`group relative aspect-square rounded-2xl transition-all duration-300 ${activePaintColor === color.hex
-                                            ? 'scale-105 shadow-xl shadow-black/50 z-10 ring-2 ring-white/50 ring-offset-2 ring-offset-black'
-                                            : 'scale-100 hover:scale-105 opacity-80 hover:opacity-100 hover:ring-2 hover:ring-white/20 hover:ring-offset-2 hover:ring-offset-black/50'
+                                        className={`aspect-square rounded-md transition-all duration-200 relative group ${activePaintColor === color.hex
+                                            ? 'ring-2 ring-white ring-offset-2 ring-offset-black z-10'
+                                            : 'hover:scale-110 hover:z-10 hover:ring-1 hover:ring-white/50 opacity-80 hover:opacity-100'
                                             }`}
-                                    >
-                                        <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
-                                        <div className="absolute inset-0 rounded-2xl border border-black/10 pointer-events-none" />
-                                        <div className="absolute inset-0 rounded-2xl" style={{ backgroundColor: color.hex }} />
-
-                                        {/* Tooltip */}
-                                        <span className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] font-medium px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 whitespace-nowrap pointer-events-none translate-y-1 group-hover:translate-y-0 border border-white/10 shadow-xl z-20">
-                                            {color.name}
-                                        </span>
-                                    </button>
+                                        style={{ backgroundColor: color.hex }}
+                                        title={color.name}
+                                    />
                                 ))}
                             </div>
-                        </div>
 
+                            {/* Selected Color Details */}
+                            <div className="mt-auto bg-white/5 border border-white/10 rounded-lg p-4 flex flex-col gap-3">
+                                {(() => {
+                                    const activeColor = PAINT_PALETTE.find(c => c.hex === activePaintColor);
+                                    if (!activeColor) return null;
+
+                                    const rgb = hexToRgb(activeColor.hex);
+                                    const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+
+                                    return (
+                                        <>
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <h3 className="text-sm font-bold text-white leading-none">{activeColor.name}</h3>
+                                                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">{activeColor.description}</p>
+                                                </div>
+                                                <div className="w-6 h-6 rounded-full shadow-inner flex-shrink-0 ml-3" style={{ backgroundColor: activeColor.hex }} />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-2 mt-1">
+                                                <div className="bg-black/40 rounded p-2 border border-white/5">
+                                                    <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">OKLCH</div>
+                                                    <div className="text-[10px] font-mono text-gray-300">{activeColor.oklch.split('/')[0]}</div>
+                                                </div>
+                                                <div className="bg-black/40 rounded p-2 border border-white/5">
+                                                    <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">HSL</div>
+                                                    <div className="text-[10px] font-mono text-gray-300">
+                                                        {Math.round(hsl.h)}°, {Math.round(hsl.s * 100)}%, {Math.round(hsl.l * 100)}%
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Sidebar Footer: Actions */}
-                    <div className="p-6 border-t border-white/5 bg-black/40 backdrop-blur-md space-y-3 z-10 relative">
-                        {/* Gradient shade at the top of footer to show scroll */}
-                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-
+                    {/* Footer - Minimal Actions */}
+                    <div className="p-4 border-t border-white/10 bg-black space-y-2">
                         <button
                             onClick={applyColorToSelection}
                             disabled={selectedMaskIds.size === 0}
-                            className="w-full py-4 relative overflow-hidden group rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                            className="w-full py-2.5 bg-white text-black text-xs font-semibold rounded-md 
+                                disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
                         >
-                            <div className={`absolute inset-0 transition-opacity duration-300 ${selectedMaskIds.size > 0 ? 'opacity-100' : 'opacity-0'}`}>
-                                <div className="absolute inset-0 bg-gradient-to-r from-orange-400 via-pink-500 to-purple-600 animate-gradient-x" />
-                                <div className="absolute inset-0 bg-white/20 group-hover:bg-white/30 transition-colors" />
-                            </div>
-                            <div className={`absolute inset-0 bg-gray-800 transition-opacity duration-300 ${selectedMaskIds.size > 0 ? 'opacity-0' : 'opacity-100'}`} />
-
-                            <span className={`relative font-bold tracking-wide transition-colors ${selectedMaskIds.size > 0 ? 'text-white' : 'text-gray-500'}`}>
-                                {selectedMaskIds.size > 0 ? 'APPLY MATERIAL' : 'SELECT REGION'}
-                            </span>
+                            {selectedMaskIds.size > 0 ? 'Apply Paint' : 'Select Region'}
                         </button>
-
                         <button
                             onClick={clearColors}
-                            className="w-full py-3 text-xs font-medium text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-all"
+                            className="w-full py-2 text-[10px] font-medium text-gray-500 hover:text-white transition-colors"
                         >
                             Reset Canvas
                         </button>
