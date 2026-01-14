@@ -92,41 +92,48 @@ export function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
- * Apply paint color to a pixel while preserving luminance (shadows/highlights)
- * This creates a realistic paint effect that maintains the surface texture
+ * Apply paint color to a pixel while preserving shadows/highlights
+ * This creates a realistic paint effect that maintains surface texture
+ * but produces vibrant, visible colors
  */
 export function applyPaintColor(
     basePixel: RGB,
     paintColor: RGB,
     normalPixel?: RGB
 ): RGB {
-    // Convert base pixel to HSL to extract luminance
+    // Convert to HSL
     const baseHsl = rgbToHsl(basePixel[0], basePixel[1], basePixel[2]);
-
-    // Convert paint color to HSL
     const paintHsl = rgbToHsl(paintColor[0], paintColor[1], paintColor[2]);
 
-    // Blend saturation slightly with original for more realism
-    const blendedSaturation = paintHsl.s * 0.85 + baseHsl.s * 0.15;
+    // Calculate the luminance delta from neutral gray (0.5)
+    // This captures the shadows and highlights of the surface
+    const luminanceDelta = baseHsl.l - 0.5;
 
-    // Use paint's hue, blended saturation, and ORIGINAL luminance
-    // This preserves shadows, highlights, and texture
-    let resultL = baseHsl.l;
+    // Apply the luminance delta to the paint color's luminance
+    // This preserves shadows (dark areas stay dark) and highlights
+    // but keeps the overall brightness closer to the paint color
+    let resultL = paintHsl.l + (luminanceDelta * 0.6);
 
-    // Optional: use normal map for additional lighting adjustment
+    // Clamp luminance
+    resultL = Math.min(1, Math.max(0.05, resultL));
+
+    // Boost saturation for more vibrant colors
+    // Paint is typically more saturated than existing wall colors
+    let resultS = Math.min(1, paintHsl.s * 1.1);
+
+    // Optional: use normal map for subtle 3D lighting effect
     if (normalPixel) {
-        // Normal map encodes surface orientation
-        // Blue channel (Z) indicates how much the surface faces the camera
-        // Higher Z = more direct = brighter
+        // Normal map blue channel (Z) indicates surface facing direction
         const normalZ = normalPixel[2] / 255;
 
-        // Subtle lighting adjustment based on surface orientation
-        const lightingFactor = 0.9 + normalZ * 0.2;
-        resultL = Math.min(1, Math.max(0, resultL * lightingFactor));
+        // Surfaces facing camera get slightly brighter
+        // Surfaces at angles get slightly darker
+        const lightingFactor = 0.85 + normalZ * 0.3;
+        resultL = Math.min(1, Math.max(0.05, resultL * lightingFactor));
     }
 
-    // Convert back to RGB
-    return hslToRgb(paintHsl.h, blendedSaturation, resultL);
+    // Use paint's hue, boosted saturation, and blended luminance
+    return hslToRgb(paintHsl.h, resultS, resultL);
 }
 
 /**

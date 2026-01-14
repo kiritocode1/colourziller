@@ -76,14 +76,17 @@ export interface PaintColor {
     hex: string;
 }
 
-// Default paint color palette
+// Default paint color palette - vibrant, saturated colors for exterior paint
 export const PAINT_PALETTE: PaintColor[] = [
-    { id: 'terracotta', name: 'Terracotta', hex: '#E07A5F' },
-    { id: 'sage', name: 'Sage Green', hex: '#81B29A' },
-    { id: 'mustard', name: 'Mustard Yellow', hex: '#F2CC8F' },
-    { id: 'ocean', name: 'Ocean Blue', hex: '#3D5A80' },
-    { id: 'lavender', name: 'Lavender', hex: '#9B8AA3' },
-    { id: 'cream', name: 'Cream White', hex: '#F4F1DE' },
+    { id: 'coral', name: 'Coral Red', hex: '#E05040' },
+    { id: 'emerald', name: 'Emerald Green', hex: '#2D8F6F' },
+    { id: 'sunflower', name: 'Sunflower Yellow', hex: '#F5C518' },
+    { id: 'royal', name: 'Royal Blue', hex: '#2955A8' },
+    { id: 'plum', name: 'Plum Purple', hex: '#7B4B8A' },
+    { id: 'ivory', name: 'Ivory White', hex: '#FFFEF0' },
+    { id: 'terracotta', name: 'Terracotta', hex: '#C75B39' },
+    { id: 'teal', name: 'Deep Teal', hex: '#1A7F8E' },
+    { id: 'burgundy', name: 'Burgundy', hex: '#8C2F39' },
 ];
 
 // View modes

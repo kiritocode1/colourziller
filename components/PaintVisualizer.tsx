@@ -11,10 +11,10 @@
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import type { MaskData, SerializedMask, ViewMode, PaintColor } from '@/lib/types';
+import type { MaskData, ViewMode } from '@/lib/types';
 import { IMAGE_SETS, PAINT_PALETTE } from '@/lib/types';
 import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks } from '@/lib/maskUtils';
-import { hexToRgb, applyPaintColor, blendColors } from '@/lib/colorUtils';
+import { hexToRgb, applyPaintColor } from '@/lib/colorUtils';
 
 interface PaintVisualizerProps {
     className?: string;
