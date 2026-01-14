@@ -3,16 +3,15 @@
 /**
  * PaintVisualizer - Main component for the ColorCraft Paint Visualizer
  *
- * Optimized Code Structure:
- * 1. Constants & Helpers: Defined outside component to prevent recreation.
- * 2. Hooks: `usePaintData` manages async loading of masks and images.
- * 3. Component: 
- *    - State management for selections and colors.
- *    - Split rendering effects (Paint Layer vs Overlay Layer) for performance.
- *    - Memoized handlers for interactions.
+ * Optimized & Gamified:
+ * - Framer Motion animations for premium feel.
+ * - "Export Utilized Palette" feature.
+ * - Split rendering for performance.
  */
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Check, Copy, Download, X, Share2, Palette, FileJson, FileCode } from 'lucide-react';
 import type { MaskData, ViewMode } from '@/lib/types';
 import { IMAGE_SETS, PAINT_PALETTE } from '@/lib/types';
 import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks } from '@/lib/maskUtils';
@@ -20,10 +19,6 @@ import { hexToRgb, rgbToHsl, applyPaintColor } from '@/lib/colorUtils';
 
 // --- Constants & Pre-calculations ---
 
-/**
- * Pre-calcuating palette details (RGB, HSL, Strings) to avoid 
- * doing this per-render for every color swatch.
- */
 const PALETTE_WITH_DETAILS = PAINT_PALETTE.map(color => {
     const rgb = hexToRgb(color.hex);
     const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
@@ -33,7 +28,7 @@ const PALETTE_WITH_DETAILS = PAINT_PALETTE.map(color => {
         hsl,
         oklchString: `oklch(${color.oklch})`,
         hslString: `hsl(${Math.round(hsl.h)} ${Math.round(hsl.s * 100)}% ${Math.round(hsl.l * 100)}%)`,
-        oklchVal: color.oklch.split('/')[0], // Extract just the value part if needed
+        oklchVal: color.oklch.split('/')[0],
     };
 });
 
@@ -48,10 +43,6 @@ interface PaintDataState {
     error: string | null;
 }
 
-/**
- * Hook to manage loading of heavy image and mask data.
- * Returns memoized data objects.
- */
 function usePaintData(setId: string) {
     const [state, setState] = useState<PaintDataState>({
         maskData: null,
@@ -72,7 +63,6 @@ function usePaintData(setId: string) {
                 const currentSet = IMAGE_SETS.find(s => s.id === setId);
                 if (!currentSet) throw new Error(`Image set ${setId} not found`);
 
-                // parallel loading
                 const [data, cleanedImg, normalImg] = await Promise.all([
                     loadMaskData(setId),
                     loadImage(`${currentSet.basePath}/cleaned.png`),
@@ -81,8 +71,6 @@ function usePaintData(setId: string) {
 
                 if (!isMounted) return;
 
-                // Heavy computation (pixel lookup) should ideally be in a worker, 
-                // but for now we do it here.
                 const lookup = buildPixelLookup(data);
 
                 setState({
@@ -122,6 +110,104 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     });
 }
 
+// --- Sub-Components ---
+
+const PaletteExportModal = ({
+    isOpen,
+    onClose,
+    usedColors
+}: {
+    isOpen: boolean;
+    onClose: () => void;
+    usedColors: typeof PALETTE_WITH_DETAILS
+}) => {
+    const [copiedType, setCopiedType] = useState<'json' | 'css' | null>(null);
+
+    const handleCopy = (type: 'json' | 'css') => {
+        let text = '';
+        if (type === 'json') {
+            text = JSON.stringify(usedColors.map(c => ({ name: c.name, hex: c.hex, okclh: c.oklch })), null, 2);
+        } else {
+            text = `:root {\n${usedColors.map(c => `  --color-${c.id}: ${c.hex}; /* ${c.name} */`).join('\n')}\n}`;
+        }
+        navigator.clipboard.writeText(text);
+        setCopiedType(type);
+        setTimeout(() => setCopiedType(null), 2000);
+    };
+
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <>
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100]"
+                    />
+                    <motion.div
+                        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                        animate={{ scale: 1, opacity: 1, y: 0 }}
+                        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-2xl shadow-2xl z-[101] overflow-hidden"
+                    >
+                        <div className="p-6 border-b border-white/10 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                <Palette className="w-5 h-5 text-indigo-400" />
+                                Project Palette
+                            </h3>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                            {usedColors.length === 0 ? (
+                                <div className="text-center text-gray-500 py-8">
+                                    No colors applied yet. Start painting!
+                                </div>
+                            ) : (
+                                <div className="grid gap-3">
+                                    {usedColors.map(color => (
+                                        <div key={color.id} className="flex items-center gap-4 bg-white/5 p-3 rounded-lg border border-white/5">
+                                            <div className="w-10 h-10 rounded-md shadow-sm" style={{ backgroundColor: color.hex }} />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="font-semibold text-sm text-gray-200">{color.name}</p>
+                                                <p className="text-xs text-gray-500 font-mono">{color.hex}</p>
+                                            </div>
+                                            <div className="text-xs text-gray-600 font-mono">
+                                                {color.oklchVal}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="p-4 bg-white/5 border-t border-white/10 flex gap-3">
+                            <button
+                                onClick={() => handleCopy('json')}
+                                disabled={usedColors.length === 0}
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {copiedType === 'json' ? <Check className="w-3.5 h-3.5 text-green-400" /> : <FileJson className="w-3.5 h-3.5" />}
+                                {copiedType === 'json' ? 'Copied JSON' : 'Copy JSON'}
+                            </button>
+                            <button
+                                onClick={() => handleCopy('css')}
+                                disabled={usedColors.length === 0}
+                                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-white text-black hover:bg-gray-200 text-xs font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {copiedType === 'css' ? <Check className="w-3.5 h-3.5 text-green-600" /> : <FileCode className="w-3.5 h-3.5" />}
+                                {copiedType === 'css' ? 'Copied CSS' : 'Copy CSS'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </>
+            )}
+        </AnimatePresence>
+    );
+};
+
 // --- Main Component ---
 
 interface PaintVisualizerProps {
@@ -139,6 +225,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
     // UI State
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isShareOpen, setIsShareOpen] = useState(false);
+    const [isPaletteModalOpen, setIsPaletteModalOpen] = useState(false);
 
     // Data Load
     const { maskData, pixelLookup, cleanedImage, normalImage, isLoading, error } = usePaintData(currentSetId);
@@ -153,33 +240,24 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         setAppliedColors(new Map());
     }, [currentSetId]);
 
-    // --- Rendering Effects ---
+    // --- Rendering Effects (Paint & Overlay) ---
+    // Kept identical to optimized version for performance, just wrapped in standard useEffects
 
-    // 1. Paint Layer: Renders background + applied colors. 
-    // This is "heavy" and should only run when images load or colors are applied.
     useEffect(() => {
         if (!cleanedImage || !maskData || !canvasRef.current || !normalImage) return;
-
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
 
-        // sync dimensions
         if (canvas.width !== maskData.width) {
             canvas.width = maskData.width;
             canvas.height = maskData.height;
         }
-
-        // Draw base
         ctx.drawImage(cleanedImage, 0, 0);
 
-        // Apply Paint
         if (appliedColors.size > 0) {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            // Create temp canvas for normals to read pixel data easily
-            // Optimization: Keep a persistent offscreen canvas for normals if memory allows, 
-            // but creating one here is acceptable for this frequency.
-            const normalCanvas = document.createElement('canvas');
+            const normalCanvas = document.createElement('canvas'); // Optimization: could be cached
             normalCanvas.width = maskData.width;
             normalCanvas.height = maskData.height;
             const normalCtx = normalCanvas.getContext('2d', { willReadFrequently: true });
@@ -187,39 +265,23 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
             if (normalCtx) {
                 normalCtx.drawImage(normalImage, 0, 0);
                 const normalData = normalCtx.getImageData(0, 0, maskData.width, maskData.height);
-
-                // Pixel processing loop
                 const pixels = imageData.data;
                 const normals = normalData.data;
 
                 for (const mask of maskData.masks) {
                     const colorHex = appliedColors.get(mask.id);
                     if (!colorHex) continue;
-
                     const paintRgb = hexToRgb(colorHex);
 
                     for (let i = 0; i < mask.pixelIndices.length; i++) {
                         const pIdx = mask.pixelIndices[i];
                         const idx = pIdx * 4;
-
-                        // Inline pixel access for speed
-                        const baseR = pixels[idx];
-                        const baseG = pixels[idx + 1];
-                        const baseB = pixels[idx + 2];
-
-                        const normR = normals[idx];
-                        const normG = normals[idx + 1];
-                        const normB = normals[idx + 2];
-
                         const [r, g, b] = applyPaintColor(
-                            [baseR, baseG, baseB],
+                            [pixels[idx], pixels[idx + 1], pixels[idx + 2]],
                             paintRgb,
-                            [normR, normG, normB]
+                            [normals[idx], normals[idx + 1], normals[idx + 2]]
                         );
-
-                        pixels[idx] = r;
-                        pixels[idx + 1] = g;
-                        pixels[idx + 2] = b;
+                        pixels[idx] = r; pixels[idx + 1] = g; pixels[idx + 2] = b;
                     }
                 }
                 ctx.putImageData(imageData, 0, 0);
@@ -227,11 +289,8 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         }
     }, [cleanedImage, normalImage, maskData, appliedColors]);
 
-    // 2. Overlay Layer: Renders selection highlights.
-    // This is "fast" and runs on interactions (hover/select).
     useEffect(() => {
         if (!maskData || !overlayCanvasRef.current) return;
-
         const canvas = overlayCanvasRef.current;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
@@ -240,40 +299,27 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
             canvas.width = maskData.width;
             canvas.height = maskData.height;
         }
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // X-Ray Mode
         if (viewMode === 'all-masks') {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-
             for (const mask of maskData.masks) {
                 const [r, g, b] = hexToRgb(mask.displayColor);
                 for (let i = 0; i < mask.pixelIndices.length; i++) {
                     const idx = mask.pixelIndices[i] * 4;
-                    data[idx] = r;
-                    data[idx + 1] = g;
-                    data[idx + 2] = b;
-                    data[idx + 3] = 180;
+                    data[idx] = r; data[idx + 1] = g; data[idx + 2] = b; data[idx + 3] = 180;
                 }
             }
             ctx.putImageData(imageData, 0, 0);
-        }
-        // Selection Highlight
-        else if (selectedMaskIds.size > 0) {
+        } else if (selectedMaskIds.size > 0) {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageData.data;
-
             for (const mask of maskData.masks) {
                 if (!selectedMaskIds.has(mask.id)) continue;
-
                 for (let i = 0; i < mask.pixelIndices.length; i++) {
                     const idx = mask.pixelIndices[i] * 4;
-                    data[idx] = 0;   // R
-                    data[idx + 1] = 200; // G
-                    data[idx + 2] = 255; // B
-                    data[idx + 3] = 100; // A
+                    data[idx] = 0; data[idx + 1] = 200; data[idx + 2] = 255; data[idx + 3] = 100;
                 }
             }
             ctx.putImageData(imageData, 0, 0);
@@ -285,11 +331,8 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
 
     const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
         if (!maskData || !pixelLookup || !canvasRef.current) return;
-
         const canvas = canvasRef.current;
         const rect = canvas.getBoundingClientRect();
-
-        // Map client coords to canvas coords
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
         const x = Math.floor((e.clientX - rect.left) * scaleX);
@@ -299,17 +342,13 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         if (!mask) return;
 
         if (e.shiftKey) {
-            // Instant Paint
-            if (activePaintColor) {
-                setAppliedColors(prev => new Map(prev).set(mask.id, activePaintColor));
-            }
+            if (activePaintColor) setAppliedColors(prev => new Map(prev).set(mask.id, activePaintColor));
             return;
         }
 
         setSelectedMaskIds(prev => {
             const newSet = new Set(prev);
             if (e.altKey || e.metaKey) {
-                // Smart select
                 const similar = findSimilarMasks(mask, maskData.masks);
                 similar.forEach(m => newSet.add(m.id));
             } else {
@@ -369,13 +408,18 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         PALETTE_WITH_DETAILS.find(c => c.hex === activePaintColor),
         [activePaintColor]);
 
+    const utilizedPalette = useMemo(() => {
+        const usedHexes = Array.from(new Set(appliedColors.values()));
+        return PALETTE_WITH_DETAILS.filter(c => usedHexes.includes(c.hex));
+    }, [appliedColors]);
+
 
     return (
         <div className="flex flex-col h-screen bg-black text-white font-sans selection:bg-white/20">
             {/* Navbar */}
             <nav className="flex items-center justify-between px-6 py-4 sticky top-0 z-50 bg-black border-b border-white/10">
                 <div className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-white" />
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-5 h-5 rounded-full bg-white" />
                     <span className="text-sm font-semibold tracking-wide">ColorCraft</span>
                     <span className="text-gray-600">/</span>
                     <span className="text-sm text-gray-400">Project {maskData?.imageSetId ?? '...'}</span>
@@ -393,35 +437,33 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                     </select>
 
                     <div className="relative">
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={() => setIsShareOpen(!isShareOpen)}
                             className="px-4 py-1.5 bg-white text-black text-xs font-semibold rounded-md hover:bg-gray-200 transition-colors flex items-center gap-2"
                         >
                             Export
-                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" className={`transition-transform duration-200 ${isShareOpen ? 'rotate-180' : ''}`}>
-                                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                        </button>
+                            <Share2 className="w-3 h-3" />
+                        </motion.button>
 
-                        {isShareOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setIsShareOpen(false)} />
-                                <div className="absolute top-full right-0 mt-2 w-32 bg-[#0A0A0A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col py-1">
-                                    <button
-                                        onClick={() => handleExport('png')}
-                                        className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                        <AnimatePresence>
+                            {isShareOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsShareOpen(false)} />
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }}
+                                        className="absolute top-full right-0 mt-2 w-32 bg-[#0A0A0A] border border-white/10 rounded-lg shadow-xl overflow-hidden z-50 flex flex-col py-1"
                                     >
-                                        PNG Image
-                                    </button>
-                                    <button
-                                        onClick={() => handleExport('jpeg')}
-                                        className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
-                                    >
-                                        JPG Image
-                                    </button>
-                                </div>
-                            </>
-                        )}
+                                        <button onClick={() => handleExport('png')} className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-2">
+                                            <Download className="w-3 h-3" /> PNG Image
+                                        </button>
+                                        <button onClick={() => handleExport('jpeg')} className="px-4 py-2 text-left text-[10px] text-gray-300 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-2">
+                                            <Download className="w-3 h-3" /> JPG Image
+                                        </button>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
                     </div>
                 </div>
             </nav>
@@ -429,13 +471,21 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
             <main className="flex-1 overflow-hidden grid grid-cols-[1fr_320px]">
                 {/* Canvas Area */}
                 <div className="relative bg-black flex flex-col items-center justify-center p-8 group">
-                    <div className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
+                    <motion.div
+                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
+                        className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+                    >
                         <div className="bg-black border border-white/10 rounded px-3 py-1.5 shadow-xl">
                             <p className="text-[10px] text-gray-400 font-mono">SHIFT + CLICK TO PAINT</p>
                         </div>
-                    </div>
+                    </motion.div>
 
-                    <div className={`relative transition-opacity duration-500 ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: isLoading ? 0 : 1, scale: 1 }}
+                        transition={{ duration: 0.5, ease: "easeOut" }}
+                        className="relative"
+                    >
                         <canvas
                             ref={canvasRef}
                             className="max-w-full max-h-[85vh] object-contain rounded-md shadow-2xl shadow-black"
@@ -447,28 +497,36 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                             className="absolute top-0 left-0 max-w-full max-h-[85vh] object-contain rounded-md transition-transform duration-200"
                             style={{ cursor: 'crosshair' }}
                         />
-                    </div>
+                    </motion.div>
 
                     {isLoading && (
                         <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-20">
-                            <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                            <motion.div
+                                animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                                className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full"
+                            />
                         </div>
                     )}
                     {error && (
                         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                            <span className="text-red-500 text-sm font-mono">{error} - Check Console</span>
+                            <span className="text-red-500 text-sm font-mono">{error}</span>
                         </div>
                     )}
                 </div>
 
                 {/* Sidebar */}
-                <aside className="border-l border-white/10 bg-black flex flex-col h-full">
+                <motion.aside
+                    initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ duration: 0.4 }}
+                    className="border-l border-white/10 bg-black flex flex-col h-full"
+                >
 
                     {/* Header */}
                     <div className="p-4 border-b border-white/10 flex items-center justify-between">
                         <span className="text-xs font-medium text-gray-400">Properties</span>
                         <div className="flex gap-3 text-[10px] font-mono text-gray-500">
-                            <span>{stats.maskCount} REGIONS</span>
+                            <motion.span key={stats.maskCount} initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}>
+                                {stats.maskCount} REGIONS
+                            </motion.span>
                             <span>{(stats.pixelCount / 1000).toFixed(1)}K PX</span>
                         </div>
                     </div>
@@ -479,24 +537,18 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                         {/* View Controls */}
                         <div>
                             <div className="flex p-0.5 rounded-lg border border-white/10 bg-gray-900/50">
-                                <button
-                                    onClick={() => setViewMode('normal')}
-                                    className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all ${viewMode === 'normal'
-                                        ? 'bg-gray-800 text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-300'
-                                        }`}
-                                >
-                                    REALISTIC
-                                </button>
-                                <button
-                                    onClick={() => setViewMode('all-masks')}
-                                    className={`flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all ${viewMode === 'all-masks'
-                                        ? 'bg-gray-800 text-white shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-300'
-                                        }`}
-                                >
-                                    X-RAY
-                                </button>
+                                {(['normal', 'all-masks'] as const).map((mode) => (
+                                    <button
+                                        key={mode}
+                                        onClick={() => setViewMode(mode)}
+                                        className={`relative flex-1 py-1.5 rounded-md text-[10px] font-semibold tracking-wide transition-all z-10 ${viewMode === mode ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        {viewMode === mode && (
+                                            <motion.div layoutId="viewMode" className="absolute inset-0 bg-gray-800 rounded-md shadow-sm -z-10" />
+                                        )}
+                                        {mode === 'normal' ? 'REALISTIC' : 'X-RAY'}
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
@@ -507,104 +559,135 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                                 <span className="text-[10px] text-gray-500 font-mono">{PAINT_PALETTE.length}</span>
                             </div>
 
-                            <div className="grid grid-cols-5 gap-2 content-start">
+                            <motion.div
+                                className="grid grid-cols-5 gap-2 content-start"
+                                variants={{ show: { transition: { staggerChildren: 0.02 } } }}
+                                initial="hidden" animate="show"
+                            >
                                 {PALETTE_WITH_DETAILS.map(color => (
-                                    <button
+                                    <motion.button
                                         key={color.id}
+                                        variants={{ hidden: { opacity: 0, scale: 0.8 }, show: { opacity: 1, scale: 1 } }}
+                                        whileHover={{ scale: 1.15, zIndex: 10, transition: { duration: 0.2 } }}
+                                        whileTap={{ scale: 0.9 }}
                                         onClick={() => setActivePaintColor(color.hex)}
-                                        className={`aspect-square rounded-md transition-all duration-200 relative group ${activePaintColor === color.hex
-                                            ? 'ring-2 ring-white ring-offset-2 ring-offset-black z-10'
-                                            : 'hover:scale-110 hover:z-10 hover:ring-1 hover:ring-white/50 opacity-80 hover:opacity-100'
-                                            }`}
+                                        className={`aspect-square rounded-md relative group ${activePaintColor === color.hex ? 'ring-2 ring-white ring-offset-2 ring-offset-black z-10' : 'opacity-80 hover:opacity-100'}`}
                                         style={{ backgroundColor: color.hex }}
                                         title={color.name}
                                     />
                                 ))}
-                            </div>
+                            </motion.div>
 
                             {/* Details Panel */}
                             <div className="mt-auto flex flex-col gap-3">
-                                {activeColorDetails && (
-                                    <div className="bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-inner">
-                                        {/* Header */}
-                                        <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-4 h-4 rounded-full ring-1 ring-white/20" style={{ backgroundColor: activeColorDetails.hex }} />
-                                                <span className="text-sm font-bold text-gray-200">{activeColorDetails.name}</span>
+                                <AnimatePresence mode="wait">
+                                    {activeColorDetails && (
+                                        <motion.div
+                                            key={activeColorDetails.id}
+                                            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+                                            className="bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-inner"
+                                        >
+                                            {/* Header */}
+                                            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-4 h-4 rounded-full ring-1 ring-white/20" style={{ backgroundColor: activeColorDetails.hex }} />
+                                                    <span className="text-sm font-bold text-gray-200">{activeColorDetails.name}</span>
+                                                </div>
+                                                <span className="text-[10px] font-mono text-gray-600 uppercase tracking-wider">CSS Variables</span>
                                             </div>
-                                            <span className="text-[10px] font-mono text-gray-600 uppercase tracking-wider">CSS Variables</span>
-                                        </div>
 
-                                        {/* Code Block */}
-                                        <div className="p-4 space-y-3 font-mono text-[10px] leading-relaxed">
-                                            {/* OKLCH */}
-                                            <button
-                                                className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
-                                                onClick={() => copyToClipboard(activeColorDetails.oklchString, 'oklch')}
-                                            >
-                                                <div className="flex items-center gap-3 text-gray-400">
-                                                    <span className="w-8 text-rose-400">oklch</span>
-                                                    <span className="text-gray-300">({activeColorDetails.oklchVal})</span>
-                                                </div>
-                                                <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'oklch' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
-                                                    {copiedField === 'oklch' ? 'COPIED' : 'COPY'}
-                                                </span>
-                                            </button>
+                                            {/* Code Block */}
+                                            <div className="p-4 space-y-3 font-mono text-[10px] leading-relaxed">
+                                                {/* OKLCH */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(activeColorDetails.oklchString, 'oklch')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-rose-400">oklch</span>
+                                                        <span className="text-gray-300">({activeColorDetails.oklchVal})</span>
+                                                    </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'oklch' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'oklch' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
 
-                                            {/* HSL */}
-                                            <button
-                                                className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
-                                                onClick={() => copyToClipboard(activeColorDetails.hslString, 'hsl')}
-                                            >
-                                                <div className="flex items-center gap-3 text-gray-400">
-                                                    <span className="w-8 text-blue-400">hsl</span>
-                                                    <span className="text-gray-300">({Math.round(activeColorDetails.hsl.h)} {Math.round(activeColorDetails.hsl.s * 100)}% {Math.round(activeColorDetails.hsl.l * 100)}%)</span>
-                                                </div>
-                                                <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hsl' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
-                                                    {copiedField === 'hsl' ? 'COPIED' : 'COPY'}
-                                                </span>
-                                            </button>
+                                                {/* HSL */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(activeColorDetails.hslString, 'hsl')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-blue-400">hsl</span>
+                                                        <span className="text-gray-300">({Math.round(activeColorDetails.hsl.h)} {Math.round(activeColorDetails.hsl.s * 100)}% {Math.round(activeColorDetails.hsl.l * 100)}%)</span>
+                                                    </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hsl' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'hsl' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
 
-                                            {/* HEX */}
-                                            <button
-                                                className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
-                                                onClick={() => copyToClipboard(activeColorDetails.hex, 'hex')}
-                                            >
-                                                <div className="flex items-center gap-3 text-gray-400">
-                                                    <span className="w-8 text-emerald-400">hex</span>
-                                                    <span className="text-gray-300">{activeColorDetails.hex.toLowerCase()}</span>
-                                                </div>
-                                                <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hex' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
-                                                    {copiedField === 'hex' ? 'COPIED' : 'COPY'}
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
+                                                {/* HEX */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(activeColorDetails.hex, 'hex')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-emerald-400">hex</span>
+                                                        <span className="text-gray-300">{activeColorDetails.hex.toLowerCase()}</span>
+                                                    </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hex' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'hex' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
                     </div>
 
                     {/* Actions Footer */}
                     <div className="p-4 border-t border-white/10 bg-black space-y-2">
-                        <button
+                        <motion.button
+                            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                             onClick={applyColorToSelection}
                             disabled={selectedMaskIds.size === 0}
                             className="w-full py-2.5 bg-white text-black text-xs font-semibold rounded-md 
-                                disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors"
+                                disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
                         >
-                            {selectedMaskIds.size > 0 ? 'Apply Paint' : 'Select Region'}
-                        </button>
-                        <button
-                            onClick={clearColors}
-                            className="w-full py-2 text-[10px] font-medium text-gray-500 hover:text-white transition-colors"
-                        >
-                            Reset Canvas
-                        </button>
+                            {selectedMaskIds.size > 0 ? (
+                                <>Apply Paint <span className="px-1.5 py-0.5 bg-black/10 rounded-full text-[9px]">{selectedMaskIds.size}</span></>
+                            ) : 'Select Region'}
+                        </motion.button>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <motion.button
+                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                onClick={() => setIsPaletteModalOpen(true)}
+                                className="w-full py-2 bg-gray-900 border border-white/10 text-gray-300 text-[10px] font-medium rounded-md hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
+                            >
+                                <Palette className="w-3 h-3" /> View Palette
+                            </motion.button>
+                            <motion.button
+                                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+                                onClick={clearColors}
+                                className="w-full py-2 bg-gray-900 border border-white/10 text-gray-300 text-[10px] font-medium rounded-md hover:bg-gray-800 transition-colors"
+                            >
+                                Reset Canvas
+                            </motion.button>
+                        </div>
                     </div>
 
-                </aside>
+                </motion.aside>
             </main>
+
+            {/* Modals */}
+            <PaletteExportModal
+                isOpen={isPaletteModalOpen}
+                onClose={() => setIsPaletteModalOpen(false)}
+                usedColors={utilizedPalette}
+            />
         </div>
     );
 }
