@@ -236,12 +236,50 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
     // Refs
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+    const isInitialMount = useRef(true);
 
-    // Reset interaction state on dataset change
+    // Persistence: Load state on mount
     useEffect(() => {
+        try {
+            const saved = localStorage.getItem('colourziller-storage-v1');
+            if (saved) {
+                const data = JSON.parse(saved);
+                if (data.currentSetId) setCurrentSetId(data.currentSetId);
+                // Note: We don't reset here because we want to keep the loaded colors
+                if (data.activePaintColor) setActivePaintColor(data.activePaintColor);
+                if (data.appliedColors) setAppliedColors(new Map(data.appliedColors));
+            }
+        } catch (e) {
+            console.error('Failed to load state', e);
+        }
+    }, []);
+
+    // Persistence: Save state on change
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        try {
+            const state = {
+                currentSetId,
+                activePaintColor,
+                appliedColors: Array.from(appliedColors.entries())
+            };
+            localStorage.setItem('colourziller-storage-v1', JSON.stringify(state));
+        } catch (e) {
+            console.error('Failed to save state', e);
+        }
+    }, [currentSetId, activePaintColor, appliedColors]);
+
+    // Handle Image Set Change
+    const handleSetChange = (newId: string) => {
+        setCurrentSetId(newId);
+        // Clear state only when manually changing sets
         setSelectedMaskIds(new Set());
         setAppliedColors(new Map());
-    }, [currentSetId]);
+    };
 
     // --- Rendering Effects (Paint & Overlay) ---
     // Kept identical to optimized version for performance, just wrapped in standard useEffects
@@ -437,7 +475,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                 <div className="flex items-center gap-4">
                     <select
                         value={currentSetId}
-                        onChange={(e) => setCurrentSetId(e.target.value)}
+                        onChange={(e) => handleSetChange(e.target.value)}
                         className="bg-black text-xs font-medium border border-white/10 rounded-md px-3 py-1.5 focus:outline-none focus:border-white/30 transition-colors text-white hover:border-white/20 cursor-pointer"
                     >
                         {IMAGE_SETS.map(set => (
