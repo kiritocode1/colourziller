@@ -31,6 +31,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
     const [activePaintColor, setActivePaintColor] = useState<string>(PAINT_PALETTE[0].hex);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [copiedField, setCopiedField] = useState<string | null>(null);
 
     // Image refs
     const [cleanedImage, setCleanedImage] = useState<HTMLImageElement | null>(null);
@@ -409,38 +410,80 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                                 ))}
                             </div>
 
-                            {/* Selected Color Details */}
-                            <div className="mt-auto bg-white/5 border border-white/10 rounded-lg p-4 flex flex-col gap-3">
+                            {/* Selected Color Details - Code Style */}
+                            <div className="mt-auto flex flex-col gap-3">
                                 {(() => {
                                     const activeColor = PAINT_PALETTE.find(c => c.hex === activePaintColor);
                                     if (!activeColor) return null;
 
                                     const rgb = hexToRgb(activeColor.hex);
                                     const hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+                                    const hslString = `hsl(${Math.round(hsl.h)} ${Math.round(hsl.s * 100)}% ${Math.round(hsl.l * 100)}%)`;
+
+                                    const copyToClipboard = (text: string, field: string) => {
+                                        navigator.clipboard.writeText(text);
+                                        setCopiedField(field);
+                                        setTimeout(() => setCopiedField(null), 2000);
+                                    };
 
                                     return (
-                                        <>
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <h3 className="text-sm font-bold text-white leading-none">{activeColor.name}</h3>
-                                                    <p className="text-[10px] text-gray-400 mt-2 leading-relaxed">{activeColor.description}</p>
+                                        <div className="bg-[#0A0A0A] border border-white/10 rounded-xl overflow-hidden shadow-inner">
+                                            {/* Header */}
+                                            <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-4 h-4 rounded-full ring-1 ring-white/20" style={{ backgroundColor: activeColor.hex }} />
+                                                    <span className="text-sm font-bold text-gray-200">{activeColor.name}</span>
                                                 </div>
-                                                <div className="w-6 h-6 rounded-full shadow-inner flex-shrink-0 ml-3" style={{ backgroundColor: activeColor.hex }} />
+                                                <span className="text-[10px] font-mono text-gray-600 uppercase tracking-wider">CSS Variables</span>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-2 mt-1">
-                                                <div className="bg-black/40 rounded p-2 border border-white/5">
-                                                    <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">OKLCH</div>
-                                                    <div className="text-[10px] font-mono text-gray-300">{activeColor.oklch.split('/')[0]}</div>
-                                                </div>
-                                                <div className="bg-black/40 rounded p-2 border border-white/5">
-                                                    <div className="text-[9px] text-gray-500 uppercase tracking-wider mb-0.5">HSL</div>
-                                                    <div className="text-[10px] font-mono text-gray-300">
-                                                        {Math.round(hsl.h)}°, {Math.round(hsl.s * 100)}%, {Math.round(hsl.l * 100)}%
+                                            {/* Code Block */}
+                                            <div className="p-4 space-y-3 font-mono text-[10px] leading-relaxed">
+
+                                                {/* OKLCH */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(`oklch(${activeColor.oklch})`, 'oklch')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-rose-400">oklch</span>
+                                                        <span className="text-gray-300">({activeColor.oklch.split('/')[0]})</span>
                                                     </div>
-                                                </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'oklch' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'oklch' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
+
+                                                {/* HSL */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(hslString, 'hsl')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-blue-400">hsl</span>
+                                                        <span className="text-gray-300">({Math.round(hsl.h)} {Math.round(hsl.s * 100)}% {Math.round(hsl.l * 100)}%)</span>
+                                                    </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hsl' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'hsl' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
+
+                                                {/* HEX */}
+                                                <button
+                                                    className="w-full group flex items-center justify-between hover:bg-white/5 -mx-2 px-2 py-1 rounded transition-colors cursor-pointer text-left"
+                                                    onClick={() => copyToClipboard(activeColor.hex, 'hex')}
+                                                >
+                                                    <div className="flex items-center gap-3 text-gray-400">
+                                                        <span className="w-8 text-emerald-400">hex</span>
+                                                        <span className="text-gray-300">{activeColor.hex.toLowerCase()}</span>
+                                                    </div>
+                                                    <span className={`text-[9px] uppercase tracking-widest transition-all duration-300 ${copiedField === 'hex' ? 'opacity-100 text-green-400 font-bold' : 'opacity-0 group-hover:opacity-100 text-gray-500'}`}>
+                                                        {copiedField === 'hex' ? 'COPIED' : 'COPY'}
+                                                    </span>
+                                                </button>
+
                                             </div>
-                                        </>
+                                        </div>
                                     );
                                 })()}
                             </div>
