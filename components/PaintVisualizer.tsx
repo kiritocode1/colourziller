@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Download, X, Share2, Palette, FileJson, FileCode } from 'lucide-react';
 import type { MaskData, ViewMode } from '@/lib/types';
 import { IMAGE_SETS, PAINT_PALETTE } from '@/lib/types';
-import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks } from '@/lib/maskUtils';
+import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks, findSmartGroup } from '@/lib/maskUtils';
 import { hexToRgb, rgbToHsl, applyPaintColor } from '@/lib/colorUtils';
 
 // --- Constants & Pre-calculations ---
@@ -458,11 +458,32 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         const mask = findMaskAtPoint(x, y, maskData, pixelLookup);
         if (!mask) return;
 
-        if (e.shiftKey) {
+        // Shift+Click - Quick paint
+        if (e.shiftKey && !e.ctrlKey && !e.metaKey) {
             if (activePaintColor) setAppliedColors(prev => new Map(prev).set(mask.id, activePaintColor));
             return;
         }
 
+        // Ctrl+Shift+Click OR Cmd+Shift+Click - Smart group selection
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey) {
+            // Get image data for color analysis
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            let imageData: Uint8ClampedArray | undefined;
+            if (ctx) {
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                imageData = imgData.data;
+            }
+
+            const smartGroup = findSmartGroup(mask, maskData.masks, maskData, imageData);
+            setSelectedMaskIds(prev => {
+                const newSet = new Set(prev);
+                smartGroup.forEach(m => newSet.add(m.id));
+                return newSet;
+            });
+            return;
+        }
+
+        // Alt+Click or Meta+Click - Normal-based similar selection
         setSelectedMaskIds(prev => {
             const newSet = new Set(prev);
             if (e.altKey || e.metaKey) {
@@ -598,8 +619,10 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
                         initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
                         className="absolute top-6 left-6 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                     >
-                        <div className="bg-black border border-white/10 rounded px-3 py-1.5 shadow-xl">
-                            <p className="text-[10px] text-gray-400 font-mono">SHIFT + CLICK TO PAINT</p>
+                        <div className="bg-black/90 backdrop-blur-sm border border-white/10 rounded-lg px-4 py-3 shadow-xl space-y-1.5">
+                            <p className="text-[10px] text-gray-400 font-mono">SHIFT + CLICK <span className="text-gray-600">→</span> <span className="text-white">Paint</span></p>
+                            <p className="text-[10px] text-gray-400 font-mono">⌘/CTRL + SHIFT + CLICK <span className="text-gray-600">→</span> <span className="text-emerald-400">Smart Select</span></p>
+                            <p className="text-[10px] text-gray-400 font-mono">ALT + CLICK <span className="text-gray-600">→</span> <span className="text-blue-400">Similar Surfaces</span></p>
                         </div>
                     </motion.div>
 
