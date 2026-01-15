@@ -11,7 +11,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, Copy, Download, X, Share2, Palette, FileJson, FileCode } from 'lucide-react';
+import { Check, Download, X, Share2, Palette, FileJson, FileCode } from 'lucide-react';
 import type { MaskData, ViewMode } from '@/lib/types';
 import { IMAGE_SETS, PAINT_PALETTE } from '@/lib/types';
 import { loadMaskData, buildPixelLookup, findMaskAtPoint, calculateSelectionStats, findSimilarMasks } from '@/lib/maskUtils';
@@ -282,7 +282,7 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
     };
 
     // --- Rendering Effects (Paint & Overlay) ---
-    // Kept identical to optimized version for performance, just wrapped in standard useEffects
+    // Uses gap-filling to handle spaces between mask regions
 
     useEffect(() => {
         if (!cleanedImage || !maskData || !canvasRef.current || !normalImage) return;
@@ -290,41 +290,117 @@ export default function PaintVisualizer({ className }: PaintVisualizerProps) {
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) return;
 
-        if (canvas.width !== maskData.width) {
-            canvas.width = maskData.width;
-            canvas.height = maskData.height;
+        const width = maskData.width;
+        const height = maskData.height;
+
+        if (canvas.width !== width) {
+            canvas.width = width;
+            canvas.height = height;
         }
         ctx.drawImage(cleanedImage, 0, 0);
 
         if (appliedColors.size > 0) {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const normalCanvas = document.createElement('canvas'); // Optimization: could be cached
-            normalCanvas.width = maskData.width;
-            normalCanvas.height = maskData.height;
+            const imageData = ctx.getImageData(0, 0, width, height);
+            const normalCanvas = document.createElement('canvas');
+            normalCanvas.width = width;
+            normalCanvas.height = height;
             const normalCtx = normalCanvas.getContext('2d', { willReadFrequently: true });
 
             if (normalCtx) {
                 normalCtx.drawImage(normalImage, 0, 0);
-                const normalData = normalCtx.getImageData(0, 0, maskData.width, maskData.height);
+                const normalData = normalCtx.getImageData(0, 0, width, height);
                 const pixels = imageData.data;
                 const normals = normalData.data;
+
+                // Build a map of pixel -> color for painted masks
+                // and a set of all painted pixel indices
+                const pixelColorMap = new Map<number, [number, number, number]>();
 
                 for (const mask of maskData.masks) {
                     const colorHex = appliedColors.get(mask.id);
                     if (!colorHex) continue;
                     const paintRgb = hexToRgb(colorHex);
 
-                    for (let i = 0; i < mask.pixelIndices.length; i++) {
-                        const pIdx = mask.pixelIndices[i];
-                        const idx = pIdx * 4;
-                        const [r, g, b] = applyPaintColor(
-                            [pixels[idx], pixels[idx + 1], pixels[idx + 2]],
-                            paintRgb,
-                            [normals[idx], normals[idx + 1], normals[idx + 2]]
-                        );
-                        pixels[idx] = r; pixels[idx + 1] = g; pixels[idx + 2] = b;
+                    for (const pIdx of mask.pixelIndices) {
+                        pixelColorMap.set(pIdx, paintRgb);
                     }
                 }
+
+                // First pass: Apply paint directly to all mask pixels
+                for (const [pIdx, paintRgb] of pixelColorMap) {
+                    const idx = pIdx * 4;
+                    const basePixel: [number, number, number] = [pixels[idx], pixels[idx + 1], pixels[idx + 2]];
+                    const normalPixel: [number, number, number] = [normals[idx], normals[idx + 1], normals[idx + 2]];
+
+                    const [r, g, b] = applyPaintColor(basePixel, paintRgb, normalPixel);
+                    pixels[idx] = r;
+                    pixels[idx + 1] = g;
+                    pixels[idx + 2] = b;
+                }
+
+                // Second pass: Fill gaps - for each unpainted pixel, check if it's surrounded by painted pixels
+                // If so, blend colors from nearby painted pixels to fill the gap
+                const gapFillRadius = 3; // How many pixels to look for nearby painted areas
+
+                for (let y = 0; y < height; y++) {
+                    for (let x = 0; x < width; x++) {
+                        const pIdx = y * width + x;
+
+                        // Skip if already painted
+                        if (pixelColorMap.has(pIdx)) continue;
+
+                        // Check neighbors for painted pixels
+                        let totalWeight = 0;
+                        let avgR = 0, avgG = 0, avgB = 0;
+                        let paintedNeighborCount = 0;
+
+                        for (let dy = -gapFillRadius; dy <= gapFillRadius; dy++) {
+                            for (let dx = -gapFillRadius; dx <= gapFillRadius; dx++) {
+                                if (dx === 0 && dy === 0) continue;
+
+                                const nx = x + dx;
+                                const ny = y + dy;
+
+                                if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+
+                                const neighborIdx = ny * width + nx;
+                                const neighborColor = pixelColorMap.get(neighborIdx);
+
+                                if (neighborColor) {
+                                    paintedNeighborCount++;
+                                    const dist = Math.sqrt(dx * dx + dy * dy);
+                                    const weight = 1 / (dist + 0.5);
+                                    totalWeight += weight;
+
+                                    // Get the already-painted color from the canvas
+                                    const nIdx = neighborIdx * 4;
+                                    avgR += pixels[nIdx] * weight;
+                                    avgG += pixels[nIdx + 1] * weight;
+                                    avgB += pixels[nIdx + 2] * weight;
+                                }
+                            }
+                        }
+
+                        // Only fill if we have enough painted neighbors (gap between painted areas)
+                        // Require neighbors on multiple sides to confirm it's a gap, not an edge
+                        if (paintedNeighborCount >= 4 && totalWeight > 0) {
+                            const idx = pIdx * 4;
+                            const basePixel: [number, number, number] = [pixels[idx], pixels[idx + 1], pixels[idx + 2]];
+
+                            // Weighted average of neighboring painted colors
+                            const blendedR = Math.round(avgR / totalWeight);
+                            const blendedG = Math.round(avgG / totalWeight);
+                            const blendedB = Math.round(avgB / totalWeight);
+
+                            // Apply with some blending to the original for smooth transition
+                            const blendFactor = Math.min(1, paintedNeighborCount / 8);
+                            pixels[idx] = Math.round(basePixel[0] * (1 - blendFactor) + blendedR * blendFactor);
+                            pixels[idx + 1] = Math.round(basePixel[1] * (1 - blendFactor) + blendedG * blendFactor);
+                            pixels[idx + 2] = Math.round(basePixel[2] * (1 - blendFactor) + blendedB * blendFactor);
+                        }
+                    }
+                }
+
                 ctx.putImageData(imageData, 0, 0);
             }
         }
