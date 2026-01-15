@@ -264,7 +264,7 @@ export function findSmartGroup(
     allMasks: SerializedMask[],
     maskData: MaskData,
     imageData?: Uint8ClampedArray,
-    similarityThreshold: number = 0.55 // Raised from 0.55 for stricter matching
+    similarityThreshold: number = 0.75 // Raised from 0.55 for stricter matching
 ): SerializedMask[] {
     const { width, height } = maskData;
 
